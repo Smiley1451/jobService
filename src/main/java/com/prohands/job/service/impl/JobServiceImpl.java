@@ -1,5 +1,6 @@
 package com.prohands.job.service.impl;
 
+import com.prohands.job.config.JobCreatedEvent;
 import com.prohands.job.dto.request.JobRequest;
 import com.prohands.job.dto.response.JobResponse;
 import com.prohands.job.entity.Job;
@@ -25,22 +26,9 @@ public class JobServiceImpl implements JobService {
     private final JobRepository jobRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-
     @Override
-    public Mono<String> createJob(JobRequest request) {
-
-        log.info("Received Creation Request. Sending to Kafka...");
-
-        return Mono.fromFuture(kafkaTemplate.send("job-create-requests", request))
-                .doOnSuccess(res -> log.info("Request pushed to Kafka: {}", request.title()))
-                .doOnError(err -> log.error("Kafka Send Failed", err))
-                .thenReturn("Job creation request accepted. Processing in background.");
-    }
-
-
-    @Override
-    public Mono<JobResponse> processJobRequest(JobRequest request) {
-        log.info("Worker: Saving Job to DB for Provider: {}", request.providerId());
+    public Mono<JobResponse> createJob(JobRequest request) {
+        log.info("Client creating job: {}", request.title());
 
         Job job = new Job();
         job.setProviderId(request.providerId());
@@ -50,9 +38,8 @@ public class JobServiceImpl implements JobService {
         job.setLatitude(request.latitude());
         job.setLongitude(request.longitude());
         job.setNumberOfEmployees(request.numberOfEmployees() != null ? request.numberOfEmployees() : 1);
-
         job.setStatus("OPEN");
-        job.setSource("KAFKA_ASYNC");
+        job.setSource("DIRECT_API");
         job.setCreatedAt(Instant.now());
         job.setUpdatedAt(Instant.now());
 
@@ -60,12 +47,24 @@ public class JobServiceImpl implements JobService {
             job.setRequiredSkills(request.requiredSkills().toArray(new String[0]));
         }
 
-
         return jobRepository.save(job)
-                .map(this::mapToResponse)
-                .doOnSuccess(saved -> log.info("Worker: Job Created! Generated ID: {}", saved.jobId()));
-    }
+                .flatMap(savedJob -> {
+                    JobCreatedEvent event = new JobCreatedEvent(
+                            savedJob.getProviderId(),
+                            savedJob.getTitle(),
+                            savedJob.getDescription(),
+                            savedJob.getWage(),
+                            savedJob.getLatitude(),
+                            savedJob.getLongitude(),
+                            Arrays.asList(savedJob.getRequiredSkills()),
+                            savedJob.getNumberOfEmployees()
+                    );
 
+                    return Mono.fromFuture(kafkaTemplate.send("job-create-requests", event))
+                            .doOnError(e -> log.error("Failed to publish JobCreatedEvent", e))
+                            .thenReturn(mapToResponse(savedJob));
+                });
+    }
 
     @Override
     public Mono<JobResponse> getJobById(UUID id) {
@@ -80,15 +79,49 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
+    public Flux<JobResponse> getJobsByProvider(String providerId) {
+        return jobRepository.findByProviderId(providerId)
+                .map(this::mapToResponse);
+    }
+
+    @Override
+    public Mono<JobResponse> updateJob(UUID jobId, JobRequest request) {
+        return jobRepository.findById(jobId)
+                .flatMap(job -> {
+                    job.setTitle(request.title());
+                    job.setDescription(request.description());
+                    job.setWage(request.wage());
+                    job.setLatitude(request.latitude());
+                    job.setLongitude(request.longitude());
+                    job.setNumberOfEmployees(request.numberOfEmployees());
+                    if (request.requiredSkills() != null) {
+                        job.setRequiredSkills(request.requiredSkills().toArray(new String[0]));
+                    }
+                    job.setUpdatedAt(Instant.now());
+                    return jobRepository.save(job);
+                })
+                .map(this::mapToResponse)
+                .switchIfEmpty(Mono.error(new RuntimeException("Job not found for update")));
+    }
+
+    @Override
     public Mono<Void> updateJobStatus(UUID jobId, String status) {
         return jobRepository.findById(jobId)
                 .flatMap(job -> {
                     job.setStatus(status);
                     job.setUpdatedAt(Instant.now());
                     return jobRepository.save(job);
-                }).then();
+                })
+                .doOnSuccess(j -> log.info("Job {} status updated to {}", jobId, status))
+                .then();
     }
 
+    @Override
+    public Mono<Void> deleteJob(UUID jobId) {
+        return jobRepository.findById(jobId)
+                .flatMap(jobRepository::delete)
+                .doOnSuccess(v -> log.info("Job {} deleted", jobId));
+    }
 
     private JobResponse mapToResponse(Job job) {
         List<String> skills = job.getRequiredSkills() != null ?
@@ -104,10 +137,7 @@ public class JobServiceImpl implements JobService {
                 job.getLatitude(),
                 job.getLongitude(),
                 skills,
-
-
                 job.getNumberOfEmployees(),
-
                 job.getCreatedAt()
         );
     }

@@ -19,28 +19,40 @@ public class JobController {
 
     private final JobService jobService;
 
-
     @PostMapping
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public Mono<String> createJob(@RequestBody @Valid JobRequest request) {
+    @ResponseStatus(HttpStatus.CREATED)
+    public Mono<JobResponse> createJob(@RequestBody @Valid JobRequest request) {
         return jobService.createJob(request);
     }
-
 
     @GetMapping("/{jobId}")
     public Mono<JobResponse> getJob(@PathVariable UUID jobId) {
         return jobService.getJobById(jobId);
     }
 
-
     @GetMapping
     public Flux<JobResponse> getAllJobs() {
         return jobService.getAllJobs();
     }
 
+    @GetMapping("/provider/{providerId}")
+    public Flux<JobResponse> getJobsByProvider(@PathVariable String providerId) {
+        return jobService.getJobsByProvider(providerId);
+    }
+
+    @PutMapping("/{jobId}")
+    public Mono<JobResponse> updateJob(@PathVariable UUID jobId, @RequestBody @Valid JobRequest request) {
+        return jobService.updateJob(jobId, request);
+    }
 
     @PatchMapping("/{jobId}/status")
     public Mono<Void> updateStatus(@PathVariable UUID jobId, @RequestParam String status) {
         return jobService.updateJobStatus(jobId, status);
+    }
+
+    @DeleteMapping("/{jobId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> deleteJob(@PathVariable UUID jobId) {
+        return jobService.deleteJob(jobId);
     }
 }

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record JobRequest(
-        @NotNull UUID providerId,
+        @NotNull String providerId,
         @NotBlank String title,
         String description,
         @Min(1) BigDecimal wage,

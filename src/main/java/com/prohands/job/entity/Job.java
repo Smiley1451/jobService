@@ -21,7 +21,7 @@ public class Job {
     private UUID id;
 
     @Column("provider_id")
-    private UUID providerId;
+    private String providerId;
 
     private String title;
     private String description;

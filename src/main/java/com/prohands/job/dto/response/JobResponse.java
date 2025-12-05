@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public record JobResponse(
         UUID jobId,
-        UUID providerId,
+        String providerId,
         String title,
         String description,
         BigDecimal wage,

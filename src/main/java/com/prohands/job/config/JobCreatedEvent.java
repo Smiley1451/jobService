@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public record JobCreatedEvent(
 
-        UUID providerId,
+        String providerId,
         String title,
         String description,
         BigDecimal wage,
