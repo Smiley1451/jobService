@@ -40,6 +40,16 @@ public class JobController {
         return jobService.getJobsByProvider(providerId);
     }
 
+    @GetMapping("/feed")
+    public Flux<JobResponse> getJobFeed(
+            @RequestParam double latitude,
+            @RequestParam double longitude,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        return jobService.getJobFeed(latitude, longitude, page, size);
+    }
+
     @PutMapping("/{jobId}")
     public Mono<JobResponse> updateJob(@PathVariable UUID jobId, @RequestBody @Valid JobRequest request) {
         return jobService.updateJob(jobId, request);

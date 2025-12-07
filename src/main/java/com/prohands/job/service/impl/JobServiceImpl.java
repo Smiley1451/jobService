@@ -117,6 +117,18 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
+    public Flux<JobResponse> getJobFeed(double lat, double lon, int page, int size) {
+
+        long offset = (long) page * size;
+
+        log.debug("Fetching job feed for lat: {}, lon: {}, page: {}", lat, lon, page);
+
+        return jobRepository.findNearbyJobs(lat, lon, size, offset)
+                .map(this::mapToResponse);
+    }
+
+
+    @Override
     public Mono<Void> deleteJob(UUID jobId) {
         return jobRepository.findById(jobId)
                 .flatMap(jobRepository::delete)

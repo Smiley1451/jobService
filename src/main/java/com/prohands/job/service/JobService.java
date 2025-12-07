@@ -18,4 +18,5 @@ public interface JobService {
     Mono<JobResponse> updateJob(UUID jobId, JobRequest request);
     Mono<Void> updateJobStatus(UUID jobId, String status);
     Mono<Void> deleteJob(UUID jobId);
+    Flux<JobResponse> getJobFeed(double lat, double lon, int page, int size);
 }
