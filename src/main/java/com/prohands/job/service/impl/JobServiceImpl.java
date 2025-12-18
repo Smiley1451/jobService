@@ -49,6 +49,8 @@ public class JobServiceImpl implements JobService {
 
         return jobRepository.save(job)
                 .flatMap(savedJob -> {
+                    List<String> skillsList = savedJob.getRequiredSkills() != null ? Arrays.asList(savedJob.getRequiredSkills()) : List.of();
+
                     JobCreatedEvent event = new JobCreatedEvent(
                             savedJob.getProviderId(),
                             savedJob.getTitle(),
@@ -56,7 +58,7 @@ public class JobServiceImpl implements JobService {
                             savedJob.getWage(),
                             savedJob.getLatitude(),
                             savedJob.getLongitude(),
-                            Arrays.asList(savedJob.getRequiredSkills()),
+                            skillsList,
                             savedJob.getNumberOfEmployees()
                     );
 
